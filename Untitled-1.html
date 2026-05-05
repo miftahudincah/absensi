@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    <title>Sistem Absensi (Vue + Tailwind)</title>
+    
+    <!-- TAILWIND CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        bg: '#121212',
+                        card: '#1e1e1e',
+                        primary: '#00bcd4',
+                        primaryHover: '#008ba3',
+                        secondary: '#ff9800',
+                        danger: '#f44336',
+                        success: '#4caf50',
+                        border: '#333'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- VUE.JS 3 CDN -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    
+    <!-- CUSTOM CSS (Untuk Scrollbar & Animasi) -->
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #121212; color: #e0e0e0; }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e1e1e; }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+        
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
+        
+        .slide-enter-active, .slide-leave-active { transition: all 0.3s ease; }
+        .slide-enter-from, .slide-leave-to { transform: translateY(-20px); opacity: 0; }
+    </style>
+</head>
+<body>
+
+    <!-- Vue App Root -->
+    <div id="app" class="h-screen flex flex-col relative">
+        
+        <!-- TOAST NOTIFICATION -->
+        <div :class="['fixed z-50 left-1/2 bottom-8 transform -translate-x-1/2 px-4 py-4 rounded shadow-lg transition-all duration-500', toast.show ? 'visible' : 'invisible', toast.type === 'error' ? 'border-l-4 border-danger bg-gray-800' : 'border-l-4 border-primary bg-gray-800']" style="min-width: 300px; text-align: center;">
+            {{ toast.message }}
+        </div>
+
+        <!-- AUTH SECTION -->
+        <div v-if="!currentUser" class="fixed inset-0 flex justify-center items-center bg-bg z-40 overflow-y-auto p-4">
+            
+            <!-- LOGIN CARD -->
+            <div v-if="authMode === 'login'" class="bg-card p-8 rounded-lg shadow-lg w-full max-w-md border border-border text-center">
+                <h2 class="text-primary text-2xl font-bold mb-1">🔐 Login Sistem</h2>
+                <p class="text-sm text-gray-400 mb-6">Masuk untuk Absensi & Admin</p>
+
+                <form @submit.prevent="handleLogin" class="space-y-4">
+                    <div class="text-left">
+                        <label class="block text-sm text-gray-400 mb-1">Email</label>
+                        <input type="email" v-model="loginForm.email" class="w-full p-2.5 bg-[#2c2c2c] border border-border text-white rounded focus:outline-none focus:border-primary transition-colors" placeholder="admin@sekolah.sch.id" required>
+                    </div>
+                    <div class="text-left relative">
+                        <label class="block text-sm text-gray-400 mb-1">Password</label>
+                        <input :type="showPassword.login ? 'text' : 'password'" v-model="loginForm.password" class="w-full p-2.5 bg-[#2c2c2c] border border-border text-white rounded focus:outline-none focus:border-primary transition-colors pr-10" placeholder="••••" required>
+                        <span @click="showPassword.login = !showPassword.login" class="absolute right-3 top-9 cursor-pointer text-gray-500 hover:text-primary">
+                            {{ showPassword.login ? '🙈' : '👁️' }}
+                        </span>
+                    </div>
+                    <button type="submit" class="w-full py-3 bg-primary hover:bg-primaryHover text-white font-bold rounded transition-colors">MASUK</button>
+                </form>
+
+                <div class="mt-4 text-sm text-gray-500">
+                    <span class="cursor-pointer hover:text-primary" @click="openModal('forgot')">Lupa Password?</span>
+                </div>
+                <div class="text-sm text-gray-500">
+                    Belum punya akun? <span class="cursor-pointer hover:text-primary underline" @click="authMode = 'register'">Daftar disini</span>
+                </div>
+            </div>
+
+            <!-- REGISTER CARD -->
+            <div v-else class="bg-card p-8 rounded-lg shadow-lg w-full max-w-md border border-border text-center">
+                <h2 class="text-secondary text-2xl font-bold mb-1">📝 Pendaftaran Akun</h2>
+                
+                <!-- Type Selector -->
+                <div class="flex bg-[#2c2c2c] p-1 rounded-lg mb-6">
+                    <button @click="regMode = 'siswa'" :class="['flex-1 py-2 font-bold rounded transition-colors', regMode === 'siswa' ? 'bg-primary text-white' : 'text-gray-500 hover:text-white']">SISWA</button>
+                    <button @click="regMode = 'guru'" :class="['flex-1 py-2 font-bold rounded transition-colors', regMode === 'guru' ? 'bg-secondary text-white' : 'text-gray-500 hover:text-white']">GURU</button>
+                </div>
+
+                <!-- Form Siswa -->
+                <form v-if="regMode === 'siswa'" @submit.prevent="handleRegister('siswa')" class="space-y-4 text-left">
+                    <div class="bg-blue-900/20 border-l-4 border-primary p-3 rounded text-sm text-gray-300">
+                        <strong>Info Siswa:</strong> Masukkan ID & Kode yang diberikan Admin.
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-400">ID Siswa (FP ID)</label>
+                        <input type="number" v-model="regSiswa.id" @blur="checkSiswaId" class="w-full p-2.5 bg-[#2c2c2c] border border-border rounded text-white focus:border-primary outline-none" placeholder="Contoh: 12345" required>
+                        <!-- Preview Box -->
+                        <div v-if="siswaPreview.nama" :class="['mt-2 p-2 rounded text-sm', siswaPreview.hasAccount ? 'bg-red-900/20 border-l-4 border-danger' : 'bg-green-900/20 border-l-4 border-success']">
+                            <strong v-if="siswaPreview.hasAccount">Duplikasi:</strong> {{ siswaPreview.nama }} <span v-if="siswaPreview.hasAccount">sudah punya akun</span>
+                            <template v-else>Data Ditemukan: {{ siswaPreview.nama }} - {{ siswaPreview.kelas }}</template>
+                        </div>
+                        <div v-if="siswaPreview.error" class="mt-2 p-2 bg-red-900/20 border-l-4 border-danger rounded text-sm text-gray-300">
+                            {{ siswaPreview.error }}
+                        </div>
+                    </div>
+                    <div><label class="text-sm text-gray-400">Email</label><input type="email" v-model="regSiswa.email" class="w-full p-2.5 bg-[#2c2c2c] border border-border rounded text-white focus:border-primary outline-none" required></div>
+                    <div><label class="text-sm text-gray-400">Password</label><input type="password" v-model="regSiswa.password" class="w-full p-2.5 bg-[#2c2c2c] border border-border rounded text-white focus:border-primary outline-none" minlength="6" required></div>
+                    <div><label class="text-sm text-gray-400">Kode Pendaftaran</label><input type="text" v-model="regSiswa.code" class="w-full p-2.5 bg-[#2c2c2c] border border-border rounded text-white focus:border-primary outline-none uppercase font-bold tracking-wider" required></div>
+                    <button type="submit" class="w-full py-3 bg-primary hover:bg-primaryHover text-white font-bold rounded">DAFTAR AKUN SISWA</button>
+                </form>
+
+                <!-- Form Guru -->
+                <form v-else @submit.prevent="handleRegister('guru')" class="space-y-4 text-left">
+                    <div class="bg-orange-900/20 border-l-4 border-secondary p-3 rounded text-sm text-gray-300">
+                        <strong>Info Guru:</strong> Gunakan kode pendaftaran yang diberikan Admin.
+                    </div>
+                    <div><label class="text-sm text-gray-400">Nama Lengkap</label><input type="text" v-model="regGuru.nama" class="w-full p-2.5 bg-[#2c2c2c] border border-border rounded text-white focus:border-primary outline-none" required></div>
+                    <div><label class="text-sm text-gray-400">Email</label><input type="email" v-model="regGuru.email" class="w-full p-2.5 bg-[#2c2c2c] border border-border rounded text-white focus:border-primary outline-none" required></div>
+                    <div><label class="text-sm text-gray-400">Password</label><input type="password" v-model="regGuru.password" class="w-full p-2.5 bg-[#2c2c2c] border border-border rounded text-white focus:border-primary outline-none" minlength="6" required></div>
+                    <div><label class="text-sm text-gray-400">Kode Pendaftaran</label><input type="text" v-model="regGuru.code" class="w-full p-2.5 bg-[#2c2c2c] border border-border rounded text-white focus:border-primary outline-none uppercase font-bold tracking-wider" required></div>
+                    <button type="submit" class="w-full py-3 bg-secondary hover:bg-orange-600 text-white font-bold rounded">DAFTAR AKUN GURU</button>
+                </form>
+
+                <div class="mt-4 text-sm text-gray-500">
+                    Sudah punya akun? <span class="cursor-pointer hover:text-primary underline" @click="authMode = 'login'">Login disini</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- DASHBOARD SECTION -->
+        <div v-else class="flex-1 flex flex-col p-4 md:p-6 overflow-hidden">
+            
+            <!-- Header -->
+            <div class="bg-card p-4 rounded-lg shadow-md border border-border flex justify-between items-center flex-wrap gap-4 mb-6">
+                <div class="flex items-center gap-3">
+                    <img :src="currentUser.photoUrl || `https://ui-avatars.com/api/?name=${currentUser.nama}&background=555`" class="w-10 h-10 rounded-full border-2 border-primary object-cover">
+                    <div>
+                        <h2 class="text-primary text-xl font-bold m-0 leading-tight">{{ schoolName || 'Sistem Absensi' }}</h2>
+                        <div class="flex items-center text-sm">
+                            <span class="mr-2">{{ currentUser.nama }}</span>
+                            <span :class="['px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider', roleBadgeClass(currentUser.role)]">{{ currentUser.role }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="font-mono text-primary text-lg font-bold hidden md:block">{{ currentTime }}</div>
+                    <button @click="openModal('profile')" class="px-4 py-2 bg-secondary text-white text-sm rounded hover:bg-orange-600">👤 Profil</button>
+                    <button @click="logout" class="px-4 py-2 bg-danger text-white text-sm rounded hover:bg-red-600">Keluar</button>
+                </div>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <div class="flex gap-2 flex-wrap border-b border-border pb-2 mb-6">
+                <button v-for="tab in availableTabs" :key="tab.id" @click="activeTab = tab.id" :class="['px-4 py-2 rounded font-bold text-sm transition-colors', activeTab === tab.id ? 'bg-primary text-white' : 'text-gray-500 hover:text-white hover:bg-gray-800']">
+                    {{ tab.label }}
+                </button>
+            </div>
+
+            <!-- TAB CONTENTS -->
+            <div class="flex-1 overflow-y-auto">
+                
+                <!-- TAB ATTENDANCE -->
+                <div v-if="activeTab === 'attendance'" class="space-y-6">
+                    <div class="bg-card p-4 rounded-lg border border-border flex flex-wrap gap-4 items-center">
+                        <!-- Filters -->
+                        <div v-if="currentUser.role !== 'siswa'" class="flex items-center gap-2">
+                            <label class="text-xs text-gray-400">Kelas:</label>
+                            <select v-model="filterKelas" @change="renderTable" class="bg-[#2c2c2c] border border-border rounded text-white p-1 text-sm outline-none">
+                                <option value="all">Semua</option>
+                                <option v-for="c in uniqueClasses" :value="c">{{ c }}</option>
+                            </select>
+                        </div>
+                        <div v-if="currentUser.role !== 'siswa'" class="flex items-center gap-2">
+                            <label class="text-xs text-gray-400">Jurusan:</label>
+                            <select v-model="filterJurusan" @change="renderTable" class="bg-[#2c2c2c] border border-border rounded text-white p-1 text-sm outline-none">
+                                <option value="all">Semua</option>
+                                <option v-for="j in uniqueMajors" :value="j">{{ j }}</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label class="text-xs text-gray-400">Tanggal:</label>
+                            <select v-model="filterDate" @change="renderTable" class="bg-[#2c2c2c] border border-border rounded text-white p-1 text-sm outline-none">
+                                <option value="all">Semua</option>
+                                <option value="today">Hari Ini</option>
+                            </select>
+                        </div>
+                        <div class="ml-auto flex gap-2">
+                            <button v-if="currentUser.role === 'admin'" @click="simulateAttendance" class="px-3 py-2 bg-primary text-white rounded text-sm flex items-center gap-1">📷 Simulasi FP</button>
+                            <button v-if="currentUser.role !== 'siswa'" @click="exportExcel" class="px-3 py-2 bg-success text-white rounded text-sm flex items-center gap-1">📥 Excel</button>
+                        </div>
+                    </div>
+
+                    <div class="bg-card rounded-lg border border-border overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-[#252525] text-primary sticky top-0">
+                                    <tr>
+                                        <th class="p-3">Waktu</th>
+                                        <th class="p-3">ID FP</th>
+                                        <th class="p-3">Nama</th>
+                                        <th class="p-3">Kelas</th>
+                                        <th class="p-3">Jurusan</th>
+                                        <th class="p-3">Status</th>
+                                        <th v-if="currentUser.role !== 'siswa'" class="p-3">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="row in filteredAttendance" :key="row.id" class="border-b border-border hover:bg-[#2a2a2a]">
+                                        <td class="p-3">
+                                            <div>{{ formatTime(row.timestamp) }}</div>
+                                            <div class="text-xs text-gray-500">{{ formatDate(row.timestamp) }}</div>
+                                        </td>
+                                        <td class="p-3">{{ row.fingerprintId }}</td>
+                                        <td class="p-3 font-bold">{{ row.nama }}</td>
+                                        <td class="p-3">{{ row.kelas }}</td>
+                                        <td class="p-3">{{ row.jurusan }}</td>
+                                        <td class="p-3">
+                                            <span :style="{color: row.status === 'Hadir' ? 'var(--success)' : (row.status === 'Terlambat' ? 'var(--secondary)' : 'var(--danger)')}">● {{ row.status }}</span>
+                                        </td>
+                                        <td v-if="currentUser.role !== 'siswa'" class="p-3">
+                                            <button @click="editAttendance(row.id)" class="p-1 border border-gray-500 rounded hover:border-primary hover:text-primary mr-1">✎</button>
+                                            <button @click="deleteAttendance(row.id)" class="p-1 border border-gray-500 rounded hover:border-danger hover:text-danger">🗑</button>
+                                        </td>
+                                    </tr>
+                                    <tr v-if="filteredAttendance.length === 0">
+                                        <td colspan="7" class="p-8 text-center text-gray-500">Data tidak ditemukan.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB STUDENTS -->
+                <div v-if="activeTab === 'students'" class="space-y-6">
+                    <div v-if="currentUser.role !== 'siswa'" class="bg-card p-4 rounded-lg border border-border space-y-4">
+                        <div class="flex flex-wrap gap-2">
+                            <input type="hidden" v-model="studentForm.mode">
+                            <div class="flex-1 min-w-[100px]"><label class="text-xs text-gray-400 block mb-1">ID FP:</label><input type="number" v-model="studentForm.id" class="w-full bg-[#2c2c2c] border border-border p-2 rounded text-white outline-none" placeholder="ID"></div>
+                            <div class="flex-1 min-w-[150px]"><label class="text-xs text-gray-400 block mb-1">Nama:</label><input type="text" v-model="studentForm.nama" class="w-full bg-[#2c2c2c] border border-border p-2 rounded text-white outline-none" placeholder="Nama Siswa"></div>
+                            <div class="flex-1 min-w-[80px]"><label class="text-xs text-gray-400 block mb-1">Kelas:</label><input type="text" v-model="studentForm.kelas" class="w-full bg-[#2c2c2c] border border-border p-2 rounded text-white outline-none"></div>
+                            <div class="flex-1 min-w-[100px]"><label class="text-xs text-gray-400 block mb-1">Jurusan:</label><input type="text" v-model="studentForm.jurusan" class="w-full bg-[#2c2c2c] border border-border p-2 rounded text-white outline-none"></div>
+                            <div class="flex-1 min-w-[80px]"><label class="text-xs text-gray-400 block mb-1">Delay:</label><input type="text" v-model="studentForm.delay" class="w-full bg-[#2c2c2c] border border-border p-2 rounded text-white outline-none"></div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button @click="saveStudent" class="px-4 py-2 bg-primary text-white rounded text-sm">{{ studentForm.mode === 'add' ? '➕ Simpan Siswa' : '💾 Update' }}</button>
+                            <button v-if="studentForm.mode === 'edit'" @click="resetStudentForm" class="px-4 py-2 bg-danger text-white rounded text-sm">Batal</button>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-card p-4 rounded-lg border border-border">
+                         <input type="text" v-model="searchStudent" @input="renderStudentsTable" placeholder="🔍 Cari nama siswa..." class="w-full bg-[#2c2c2c] border border-border p-2 rounded-full text-white outline-none">
+                    </div>
+
+                    <div class="bg-card rounded-lg border border-border overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-[#252525] text-primary">
+                                    <tr>
+                                        <th class="p-3">ID FP</th>
+                                        <th class="p-3">Nama</th>
+                                        <th class="p-3">Kelas</th>
+                                        <th class="p-3">Jurusan</th>
+                                        <th class="p-3">Delay</th>
+                                        <th class="p-3">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="s in filteredStudents" :key="s.id" class="border-b border-border hover:bg-[#2a2a2a]">
+                                        <td class="p-3">{{ s.id }}</td>
+                                        <td class="p-3">{{ s.nama }}</td>
+                                        <td class="p-3">{{ s.kelas }}</td>
+                                        <td class="p-3">{{ s.jurusan }}</td>
+                                        <td class="p-3">{{ s.delayOut }}</td>
+                                        <td class="p-3">
+                                            <button @click="editStudent(s.id)" class="p-1 border border-gray-500 rounded hover:border-primary hover:text-primary mr-1">✎</button>
+                                            <button @click="deleteStudent(s.id)" class="p-1 border border-gray-500 rounded hover:border-danger hover:text-danger">🗑</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB USERS -->
+                <div v-if="activeTab === 'users'" class="space-y-6">
+                    
+                    <!-- Generate Code Section -->
+                    <div v-if="currentUser.role !== 'siswa'" class="space-y-4">
+                        <div class="bg-card p-4 rounded-lg border border-border flex justify-between items-center flex-wrap gap-2 border-l-4 border-primary">
+                            <div>
+                                <strong class="text-primary block">Generate Kode Siswa</strong>
+                                <span class="text-xs text-gray-400">Satu ID hanya didaftarkan sekali.</span>
+                            </div>
+                            <button @click="openGenerateModal('siswa')" class="px-4 py-2 bg-primary text-white rounded text-sm">Pilih Siswa & Generate</button>
+                        </div>
+
+                        <div class="bg-card p-4 rounded-lg border border-border flex justify-between items-center flex-wrap gap-2 border-l-4 border-secondary">
+                            <div>
+                                <strong class="text-secondary block">Generate Kode Guru</strong>
+                                <span class="text-xs text-gray-400">Membuat kode akun baru.</span>
+                            </div>
+                            <button @click="openGenerateModal('guru')" class="px-4 py-2 bg-secondary text-white rounded text-sm">Generate Guru</button>
+                        </div>
+
+                        <div v-if="generatedCode" class="p-4 bg-orange-900/20 border border-secondary rounded text-center">
+                            <span class="text-secondary font-bold text-xl">{{ generatedCode }}</span>
+                        </div>
+
+                        <div class="bg-card rounded-lg border border-border overflow-hidden">
+                            <h4 class="p-3 bg-[#252525] text-gray-400 text-sm font-bold mb-0">Daftar Kode Aktif</h4>
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-[#252525]">
+                                    <tr>
+                                        <th class="p-2">Kode</th>
+                                        <th class="p-2">Tipe</th>
+                                        <th class="p-2">Target</th>
+                                        <th class="p-2">Status</th>
+                                        <th class="p-2">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="c in sortedCodes" :key="c.code" class="border-b border-border">
+                                        <td class="p-2 font-mono">{{ c.code }}</td>
+                                        <td class="p-2 text-xs" :class="c.type === 'siswa' ? 'text-primary' : 'text-secondary'">{{ c.type.toUpperCase() }}</td>
+                                        <td class="p-2 text-xs">{{ getTargetName(c) }}</td>
+                                        <td class="p-2 text-xs" :class="c.used ? 'text-success' : 'text-gray-500'">{{ c.used ? 'Terpakai' : 'Aktif' }}</td>
+                                        <td class="p-2">
+                                            <button v-if="!c.used" @click="deleteCode(c.code)" class="text-danger font-bold">❌</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- User List Section -->
+                    <div class="bg-card p-4 rounded-lg border border-border flex justify-between items-center gap-4 flex-wrap">
+                         <h4 class="text-primary m-0">Daftar Pengguna</h4>
+                         <input type="text" v-model="searchUser" @input="renderUsersTable" placeholder="Cari nama user..." class="bg-[#2c2c2c] border border-border p-2 rounded-full text-white outline-none text-sm">
+                    </div>
+                    <div class="bg-card rounded-lg border border-border overflow-hidden">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-[#252525]">
+                                <tr>
+                                    <th class="p-3 w-12"></th>
+                                    <th class="p-3">Nama</th>
+                                    <th class="p-3">Email</th>
+                                    <th class="p-3">Role</th>
+                                    <th class="p-3">Kelas / Jurusan</th>
+                                    <th class="p-3">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="u in filteredUsers" :key="u.id" class="border-b border-border hover:bg-[#2a2a2a]">
+                                    <td class="p-3 text-center"><img :src="u.photoUrl || `https://ui-avatars.com/api/?name=${u.nama}`" class="w-8 h-8 rounded-full mx-auto border border-border"></td>
+                                    <td class="p-3 font-bold">{{ u.nama }}</td>
+                                    <td class="p-3 text-xs">{{ u.email || '<span class="text-gray-600 italic">Belum daftar</span>' }}</td>
+                                    <td class="p-3"><span :class="['px-2 py-0.5 rounded text-xs font-bold uppercase', roleBadgeClass(u.role)]">{{ u.role }}</span></td>
+                                    <td class="p-3 text-xs">{{ u.role === 'siswa' ? `${u.kelas} - ${u.jurusan}` : (u.role === 'guru' ? 'Tenaga Pengajar' : '-') }}</td>
+                                    <td class="p-3">
+                                        <div v-if="currentUser.role === 'admin' && u.email !== currentUser.email" class="flex gap-1">
+                                            <button @click="deleteUser(u.id)" class="p-1 border border-gray-500 rounded hover:border-danger hover:text-danger">🗑</button>
+                                            <button @click="changeUserRole(u.id)" class="p-1 border border-gray-500 rounded hover:border-primary hover:text-primary">🔄</button>
+                                        </div>
+                                        <span v-else class="text-xs text-gray-500">-</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- TAB CONFIG -->
+                <div v-if="activeTab === 'config'" class="max-w-lg mx-auto space-y-6">
+                    <div class="bg-card p-6 rounded-lg border border-border">
+                        <label class="block text-sm text-gray-400 mb-2">Nama Sekolah</label>
+                        <div class="flex gap-2">
+                            <input v-if="currentUser.role === 'admin'" type="text" v-model="schoolName" class="flex-1 bg-[#2c2c2c] border border-border p-2 rounded text-white outline-none">
+                            <input v-else type="text" :value="schoolName" disabled class="flex-1 bg-[#222] border border-border p-2 rounded text-white cursor-not-allowed">
+                            <button v-if="currentUser.role === 'admin'" @click="saveSchoolName" class="px-4 py-2 bg-primary text-white rounded">Simpan</button>
+                        </div>
+                    </div>
+
+                    <div class="bg-card p-6 rounded-lg border border-border">
+                        <div class="text-success font-bold mb-1">API Status</div>
+                        <div class="text-sm text-gray-400">Connected to Firebase Realtime Database</div>
+                    </div>
+
+                    <div class="bg-card p-6 rounded-lg border border-danger border-l-4 flex justify-between items-center">
+                         <div>
+                            <strong class="text-danger">Reset Data Sistem</strong>
+                            <div class="text-sm text-gray-400">Hapus semua data users & absensi.</div>
+                         </div>
+                         <button @click="resetSystem" class="px-4 py-2 bg-danger text-white rounded">⚠️ Reset</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODALS -->
+        <!-- Modal Profile -->
+        <div v-if="modals.profile" class="fixed inset-0 z-50 flex justify-center items-center bg-black/70">
+            <div class="bg-card p-6 rounded-lg border border-primary w-full max-w-md m-4 relative animate-slide">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-primary font-bold m-0">Profil Pengguna</h3>
+                    <button @click="closeModal('profile')" class="text-gray-500 hover:text-white">✖</button>
+                </div>
+                <div class="text-center mb-6">
+                    <div class="relative inline-block cursor-pointer" @click="$refs.profileInput.click()">
+                        <img :src="currentUser.photoUrl || `https://ui-avatars.com/api/?name=${currentUser.nama}`" class="w-24 h-24 rounded-full border-4 border-primary object-cover">
+                        <input type="file" ref="profileInput" hidden accept="image/*" @change="uploadProfilePhoto">
+                        <div class="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 hover:opacity-100 transition-opacity text-white text-2xl">📷</div>
+                    </div>
+                    <p class="text-xs text-primary mt-2">Klik gambar untuk ganti</p>
+                </div>
+                
+                <div class="space-y-3">
+                    <div class="text-left">
+                        <label class="block text-xs text-gray-400 mb-1">Nama Lengkap</label>
+                        <input type="text" v-model="profileForm.nama" class="w-full bg-[#2c2c2c] border border-border p-2 rounded text-white outline-none">
+                    </div>
+                    <div class="text-center text-sm text-gray-400 mb-4">{{ currentUser.email }}</div>
+                    <div class="flex justify-between bg-[#2c2c2c] p-3 rounded items-center">
+                        <span class="text-sm">Password Akun</span>
+                        <button @click="openModal('changePass')" class="text-xs bg-primary text-white px-2 py-1 rounded">Ganti</button>
+                    </div>
+                </div>
+                <div class="mt-4 flex justify-end gap-2">
+                    <button @click="closeModal('profile')" class="px-4 py-2 bg-gray-600 text-white rounded">Tutup</button>
+                    <button @click="updateProfileName" class="px-4 py-2 bg-primary text-white rounded">Simpan Nama</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Change Pass -->
+        <div v-if="modals.changePass" class="fixed inset-0 z-50 flex justify-center items-center bg-black/70">
+             <div class="bg-card p-6 rounded-lg border border-primary w-full max-w-md m-4 relative animate-slide">
+                 <div class="flex justify-between mb-4"><h3 class="text-primary font-bold m-0">Ganti Password</h3><button @click="closeModal('changePass')" class="text-gray-500 hover:text-white">✖</button></div>
+                 <form @submit.prevent="handleChangePassword" class="space-y-3">
+                     <div><label class="text-xs text-gray-400">Password Lama</label><input type="password" v-model="changePassForm.old" required class="w-full bg-[#2c2c2c] border border-border p-2 rounded text-white outline-none"></div>
+                     <div><label class="text-xs text-gray-400">Password Baru</label><input type="password" v-model="changePassForm.new" required class="w-full bg-[#2c2c2c] border border-border p-2 rounded text-white outline-none"></div>
+                     <div><label class="text-xs text-gray-400">Konfirmasi</label><input type="password" v-model="changePassForm.confirm" required class="w-full bg-[#2c2c2c] border border-border p-2 rounded text-white outline-none"></div>
+                     <div class="flex justify-end gap-2 mt-4">
+                         <button type="button" @click="closeModal('changePass')" class="px-4 py-2 bg-gray-600 text-white rounded">Batal</button>
+                         <button type="submit" class="px-4 py-2 bg-primary text-white rounded">Simpan</button>
+                     </div>
+                 </form>
+             </div>
+        </div>
+
+        <!-- Modal Generate Code -->
+        <div v-if="modals.generate" class="fixed inset-0 z-50 flex justify-center items-center bg-black/70">
+             <div class="bg-card p-6 rounded-lg border border-primary w-full max-w-md m-4 relative animate-slide">
+                 <div class="flex justify-between mb-4"><h3 class="text-primary font-bold m-0">Generate Kode</h3><button @click="closeModal('generate')" class="text-gray-500 hover:text-white">✖</button></div>
+                 
+                 <div v-if="genForm.type === 'siswa'" class="mb-4">
+                     <label class="block text-xs text-gray-400 mb-1">Pilih Siswa</label>
+                     <select v-model="genForm.studentId" class="w-full bg-[#2c2c2c] border border-border p-2 rounded text-white outline-none">
+                         <option value="">-- Pilih Siswa --</option>
+                         <option v-for="s in studentsWithoutAccount" :value="s.id">{{ s.nama }} (ID: {{ s.id }})</option>
+                     </select>
+                 </div>
+
+                 <div class="flex justify-end gap-2">
+                     <button @click="closeModal('generate')" class="px-4 py-2 bg-gray-600 text-white rounded">Batal</button>
+                     <button @click="confirmGenerate" class="px-4 py-2 bg-primary text-white rounded">Buat Kode</button>
+                 </div>
+             </div>
+        </div>
+
+    </div>
+
+    <!-- JS FILES -->
+    <script src="firebase.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
