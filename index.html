@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="no-referrer">
-    <title>Sistem Absensi (Vue + Tailwind)</title>
+    <title>Sistem Absensi (Vue + Tailwind + Panduan)</title>
     
     <!-- TAILWIND CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -31,13 +31,13 @@
     <!-- VUE.JS 3 CDN -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     
-    <!-- CUSTOM CSS (Untuk Scrollbar & Animasi) -->
+    <!-- CUSTOM CSS -->
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #121212; color: #e0e0e0; }
         /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #1e1e1e; }
-        ::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius:4px; }
         ::-webkit-scrollbar-thumb:hover { background: #555; }
         
         .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
@@ -45,6 +45,10 @@
         
         .slide-enter-active, .slide-leave-active { transition: all 0.3s ease; }
         .slide-enter-from, .slide-leave-to { transform: translateY(-20px); opacity: 0; }
+
+        /* Guide Table Styles */
+        .guide-table th { background: #252525; padding: 8px; text-align: left; color: var(--primary); }
+        .guide-table td { border-bottom: 1px solid #333; padding: 8px; }
     </style>
 </head>
 <body>
@@ -408,6 +412,197 @@
                          <button @click="resetSystem" class="px-4 py-2 bg-danger text-white rounded">⚠️ Reset</button>
                     </div>
                 </div>
+
+                <!-- TAB GUIDE (UPDATED) -->
+                <div v-if="activeTab === 'guide'" class="bg-card p-6 md:p-10 rounded-lg border border-border">
+                    <h3 class="text-primary text-2xl font-bold mb-6">📘 Panduan Lengkap Sistem</h3>
+
+                    <!-- 1. HARDWARE -->
+                    <h4 class="text-secondary font-bold border-b border-border pb-2 mt-6">1. Perakitan Hardware (ESP32)</h4>
+                    <div class="mb-4 text-sm text-gray-300 leading-relaxed">
+                        <p class="mb-2">Sistem ini menggunakan ESP32 WROOM dengan sensor sidik jari Multiplexed.</p>
+                        <ul class="list-disc pl-5 space-y-2">
+                            <li><strong>ESP32 WROOM DevKit V1</strong></li>
+                            <li><strong>Modul Fingerprint R307 (16 Unit)</strong></li>
+                            <li><strong>Multiplexer CD4067</strong></li>
+                            <li><strong>MicroSD Card Module</strong></li>
+                            <li><strong>RTC DS3231</strong></li>
+                            <li><strong>Tombol Push Button (Connected via PCF8574)</strong></li>
+                        </ul>
+                    </div>
+
+                    <div class="overflow-x-auto mb-6 rounded-lg border border-border">
+                        <table class="w-full text-sm guide-table">
+                            <tr>
+                                <th>Komponen</th>
+                                <th>Pin ESP32</th>
+                                <th>Keterangan</th>
+                            </tr>
+                            <tr>
+                                <td>FP Sensor TX</td>
+                                <td class="font-mono">17</td>
+                                <td>Serial 2 TX</td>
+                            </tr>
+                            <tr>
+                                <td>FP Sensor RX</td>
+                                <td class="font-mono">16</td>
+                                <td>Serial 2 RX</td>
+                            </tr>
+                            <tr>
+                                <td>MUX S0 - S3</td>
+                                <td class="font-mono">26, 27, 14, 12</td>
+                                <td>Pilih sensor 1-16</td>
+                            </tr>
+                            <tr>
+                                <td>SD CS</td>
+                                <td class="font-mono">5</td>
+                                <td>Chip Select SD</td>
+                            </tr>
+                            <tr>
+                                <td>SD MOSI</td>
+                                <td class="font-mono">23</td>
+                                <td>SPI Data Out</td>
+                            </tr>
+                            <tr>
+                                <td>SD MISO</td>
+                                <td class="font-mono">19</td>
+                                <td>SPI Data In</td>
+                            </tr>
+                            <tr>
+                                <td>SD SCK</td>
+                                <td class="font-mono">18</td>
+                                <td>SPI Clock</td>
+                            </tr>
+                            <tr>
+                                <td>SDA (I2C)</td>
+                                <td class="font-mono">21</td>
+                                <td>Data RTC & MUX</td>
+                            </tr>
+                            <tr>
+                                <td>SCL (I2C)</td>
+                                <td class="font-mono">22</td>
+                                <td>Clock RTC & MUX</td>
+                            </tr>
+                            <tr>
+                                <td>PCF8574 (I/O)</td>
+                                <td class="font-mono">SDA(21), SCL(22)</td>
+                                <td>I2C Address: 0x20 (Tombol Enroll)</td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <!-- 2. WEB USAGE -->
+                    <h4 class="text-secondary font-bold border-b border-border pb-2 mt-6">2. Cara Menggunakan Aplikasi Web</h4>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        
+                        <!-- Admin Guide -->
+                        <div class="bg-[#1a1a1a] p-4 rounded-lg border border-border">
+                            <h5 class="text-secondary font-bold mb-3 flex items-center gap-2">👮 Admin / Guru</h5>
+                            <ol class="list-decimal pl-5 space-y-3 text-sm text-gray-400">
+                                <li>Login menggunakan akun <code class="text-primary">admin@sekolah.sch.id</code> (Pass: <code class="text-primary">admin123</code>).</li>
+                                <li>Buka tab <strong>"Data Siswa (FP)"</strong>.
+                                    <ul class="list-disc pl-4 mt-1 text-xs">
+                                        <li>Isi data siswa baru (Nama, Kelas, Jurusan, ID FP).</li>
+                                        <li>Klik <strong>"Simpan Siswa"</strong>. Data ini akan langsung dikirim ke Firebase.</li>
+                                    </ul>
+                                </li>
+                                <li>Buka tab <strong>"Manajemen Pengguna"</strong>.
+                                    <ul class="list-disc pl-4 mt-1 text-xs">
+                                        <li>Klik tombol <strong>"Pilih Siswa & Generate"</strong>.</li>
+                                        <li>Pilih nama siswa yang tadi ditambahkan.</li>
+                                        <li>Salin <strong>Kode 12 Karakter</strong> yang muncul.</li>
+                                        <li>Berikan kode tersebut kepada siswa terkait.</li>
+                                    </ul>
+                                </li>
+                                <li>Lihat data absensi real-time di tab <strong>"Data Absensi"</strong>.</li>
+                            </ol>
+                        </div>
+
+                        <!-- Siswa Guide -->
+                        <div class="bg-[#1a1a1a] p-4 rounded-lg border border-border">
+                            <h5 class="text-primary font-bold mb-3 flex items-center gap-2">🎓 Siswa</h5>
+                            <ol class="list-decimal pl-5 space-y-3 text-sm text-gray-400">
+                                <li>Buka aplikasi Web.</li>
+                                <li>Klik <strong>"Daftar disini"</strong>.</li>
+                                <li>Pilih tombol <strong>"SISWA"</strong>.</li>
+                                <li>Masukkan <strong>ID Siswa</strong> (FP ID) yang tertera di data admin.</li>
+                                        <ul class="list-disc pl-4 mt-1 text-xs">
+                                            <li>Jika ID valid, nama dan kelas akan muncul di layar.</li>
+                                        <li>Jika error "Duplikasi", berarti ID sudah pernah didaftarkan.</li>
+                                        <li>Jika error "Tidak ditemukan", berarti Admin belum memasukkan data.</li>
+                                        </ul>
+                                </li>
+                                <li>Masukkan <strong>Email</strong> dan <strong>Password</strong> baru.</li>
+                                <li>Masukkan <strong>Kode Pendaftaran</strong> yang diberikan Admin (12 Karakter).</li>
+                                <li>Klik <strong>"DAFTAR AKUN SISWA"</strong>.</li>
+                                <li>Login menggunakan akun baru untuk melihat data absensi Anda.</li>
+                            </ol>
+                        </div>
+
+                        <!-- Guru Guide -->
+                        <div class="bg-[#1a1a1a] p-4 rounded-lg border border-border">
+                            <h5 class="text-green-500 font-bold mb-3 flex items-center gap-2">📘 Guru</h5>
+                            <ol class="list-decimal pl-5 space-y-3 text-sm text-gray-400">
+                                <li>Login menggunakan akun Admin atau Guru.</li>
+                                <li>Buka <strong>"Manajemen Pengguna"</strong>.</li>
+                                <li>Klik <strong>"Generate Guru"</strong>.</li>
+                                <li>Salin Kode Guru (12 Karakter).</li>
+                                <li>Buka link registrasi siswa, pilih tab <strong>"GURU"</strong>.</li>
+                                <li>Isi Nama, Email, Password, dan Kode.</li>
+                                <li>Daftar berhasil dan akun siap digunakan.</li>
+                            </ol>
+                        </div>
+                    </div>
+
+                    <!-- 3. HARDWARE INTERACTION -->
+                    <h4 class="text-secondary font-bold border-b border-border pb-2 mt-6">3. Cara Kerja Hardware (ESP32)</h4>
+                    <div class="space-y-4 text-sm text-gray-300">
+                        <div class="flex items-start gap-4">
+                            <span class="bg-primary/20 text-primary px-3 py-1 rounded text-xs font-bold mt-1">MODE ABSEN</span>
+                            <div>
+                                <p class="font-bold text-white">Otomatis Scan Fingerprint</p>
+                                <p>System akan otomatis memindai sensor 1 sampai 16 secara bergantian.</p>
+                                <p>Jika jari dikenali, data dikirim ke Firebase dan Log tersimpan di SD Card.</p>
+                                <p class="text-xs text-gray-400 mt-1">Indikator: Pesan BLE "Nama Masuk" atau "Nama Pulang".</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-start gap-4">
+                            <span class="bg-secondary/20 text-secondary px-3 py-1 rounded text-xs font-bold mt-1">MODE DAFTAR</span>
+                            <div>
+                                <p class="font-bold text-white">Pendaftaran Sidik Jari (Enroll)</p>
+                                <p>Tekan <strong>TOMBOL (Connected ke PCF8574)</strong> selama 3 detik.</p>
+                                <p class="text-xs text-gray-400 mt-1">
+                                    1. Sistem akan meminta menempelkan jari 2 kali.<br>
+                                    2. Sistem memeriksa duplikasi sidik jari.<br>
+                                    3. Jika sukses, data disinkronkan ke Firebase dan ID naik otomatis.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-start gap-4">
+                            <span class="bg-danger/20 text-danger px-3 py-1 rounded text-xs font-bold mt-1">CONNECTIVITY</span>
+                            <div>
+                                <p class="font-bold text-white">Sinkronisasi Data</p>
+                                <p>Data dari <strong>SD Card</strong> akan disinkronkan ke Firebase secara otomatis jika WiFi tersambung.</p>
+                                <p>Waktu RTC disinkronkan dari NTP (Internet) setiap kali ESP32 dinyalakan atau reconnect WiFi.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. ALUR DATA -->
+                    <h4 class="text-secondary font-bold border-b border-border pb-2 mt-6">4. Alur Data Sinkronisasi</h4>
+                    <div class="bg-[#252525] p-4 rounded-lg font-mono text-xs text-gray-300 space-y-2">
+                        <p>1. <span class="text-primary">Web Admin</span> -> Add Siswa -> <span class="text-primary">Firebase (users/{id})</span> -> ESP32 Download (Update SD)</p>
+                        <p>2. <span class="text-primary">ESP32</span> -> Scan Jari -> <span class="text-success">Firebase (absensi/{date}/{id})</span> + SD Card</p>
+                        <p>3. <span class="text-primary">Web Admin</span> -> Buka Dashboard -> Baca <span class="text-success">Firebase</span> (Realtime)</p>
+                    </div>
+
+                    <div class="mt-8 p-4 bg-blue-900/20 border-l-4 border-primary rounded text-sm text-gray-300">
+                        <strong>🚀 Tips:</strong> Pastikan ESP32 dan Web App menggunakan API Key Firebase yang sama agar data sinkron.
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -415,7 +610,7 @@
         <!-- Modal Profile -->
         <div v-if="modals.profile" class="fixed inset-0 z-50 flex justify-center items-center bg-black/70">
             <div class="bg-card p-6 rounded-lg border border-primary w-full max-w-md m-4 relative animate-slide">
-                <div class="flex justify-between items-center mb-4">
+                <div class="flex justify-between mb-4">
                     <h3 class="text-primary font-bold m-0">Profil Pengguna</h3>
                     <button @click="closeModal('profile')" class="text-gray-500 hover:text-white">✖</button>
                 </div>
